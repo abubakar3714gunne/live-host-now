@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Video Streaming</title>
+  <style>
+    .video-container {
+      display: inline-block;
+      margin: 10px;
+    }
+    .video-container video {
+      width: 300px;
+      height: 200px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Live Video Streaming</h1>
+  
+  <div class="video-container" id="localVideoContainer">
+    <video id="localVideo" autoplay muted></video>
+    <button onclick="startCall('local')">Join Your Stream</button>
+    <button onclick="endCall('local')">End Your Stream</button>
+  </div>
+  
+  <div class="video-container" id="participant1Container">
+    <video id="participant1Video" autoplay></video>
+    <button onclick="startCall('participant1')">Join Participant 1</button>
+    <button onclick="endCall('participant1')">End Participant 1</button>
+  </div>
+
+  <div class="video-container" id="participant2Container">
+    <video id="participant2Video" autoplay></video>
+    <button onclick="startCall('participant2')">Join Participant 2</button>
+    <button onclick="endCall('participant2')">End Participant 2</button>
+  </div>
+
+  <div class="video-container" id="participant3Container">
+    <video id="participant3Video" autoplay></video>
+    <button onclick="startCall('participant3')">Join Participant 3</button>
+    <button onclick="endCall('participant3')">End Participant 3</button>
+  </div>
+
+  <script>
+    let localStream;
+    const peerConnections = {};
+
+    async function startCall(participant) {
+      try {
+        // Get local media stream
+        if (participant === 'local') {
+          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          document.getElementById('localVideo').srcObject = localStream;
+        }
+
+        // Initialize peer connection for the selected participant
+        const peerConnection = new RTCPeerConnection();
+        peerConnection.ontrack = event => handleTrackEvent(event, participant);
+        if (localStream) {
+          localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        }
+        peerConnections[participant] = peerConnection;
+
+        // Signal the server to let other participants know you're joining
+        // In a real-world scenario, you'd use signaling server to exchange SDP offer/answer
+        console.log(`Joining ${participant}'s stream...`);
+      } catch (error) {
+        console.error('Error starting call:', error);
+      }
+    }
+
+    async function endCall(participant) {
+      try {
+        const peerConnection = peerConnections[participant];
+        const localVideoElement = document.getElementById('localVideo');
+        const remoteVideoElement = document.getElementById(`${participant}Video`);
+
+        if (peerConnection) {
+          const senders = peerConnection.getSenders();
+          senders.forEach(sender => peerConnection.removeTrack(sender));
+
+          peerConnection.close();
+          delete peerConnections[participant];
+        }
+
+        if (participant === 'local' && localStream) {
+          localStream.getTracks().forEach(track => track.stop());
+          localVideoElement.srcObject = null;
+        } else if (remoteVideoElement) {
+          remoteVideoElement.srcObject = null;
+        }
+
+        console.log(`${participant}'s stream ended.`);
+      } catch (error) {
+        console.error('Error ending call:', error);
+      }
+    }
+
+    function handleTrackEvent(event, participant) {
+      const videoElementId = `${participant}Video`;
+      const videoElement = document.getElementById(videoElementId);
+      if (!videoElement.srcObject) {
+        videoElement.srcObject = event.streams[0];
+      }
+    }
+  </script>
+</body>
+</html>
